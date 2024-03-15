@@ -1,0 +1,102 @@
+float valor = 0;
+float filtro = 0;
+float media = 0;
+float Fatual = 0;
+float Fant = 0;
+float Erro = 0;
+float VP = 0;
+float sp = 120;
+float U = 0; //       V = Kc * ((1/Ti) * Integral(e) + e) = Ki * Integral(e) + Kp * e
+float Up = 0;
+float Ui = 0;
+float Uiant = 0;
+float Tant = 0;
+float Kp = 5; // Kp = Kc
+float Ki = 14.5; // Ki = (Kc / Ti)
+float Ts = 0;
+
+int modo = 0; //define manual e automático
+int PWM = 6; //entrada
+int analog = 15; //saida
+
+const int limite1 = 0;
+const int limite2 = 255;
+
+void setup() {
+  pinMode(PWM, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+
+  //MUDANÇA DE AUTOMÁTICO PARA MANUAL E VICE-VERSA
+  if (Serial.available()) {
+    char leitura = Serial.read();
+    switch(leitura) {
+       case 'a':
+          modo = 0;
+          Serial.println("Automatico");
+          break; 
+       case 'm':
+          modo = 1;
+          Serial.println("Manual");
+          break;
+       default:
+          Serial.println("Erro");
+       break; 
+    }
+  }  
+  
+  //APLICAÇÃO DE FILTROS NO VALOR ANALÓGICO
+  for ( int i = 0; i < 50; i++) {
+    valor = analogRead(analog);
+    if (valor > 0) {
+      media = media + valor;}
+  }
+
+  filtro = media / 50;
+  media = 0;
+  Fatual = 0.9 * Fant + 0.1 * filtro;
+
+  //TRANSFORMA FATUAL (VALOR EM BITS) EM VP (VALOR EM PWM)
+  VP = (Fatual * 255.0) / 950.0;
+  
+  //ERRO
+  Erro = sp - VP;
+
+  //LEITURA DO TEMPO ENTRE O PROCESSO ANTERIOR E O ATUAL
+  Ts = (millis() - Tant)/1000.0; //divide por 1000 para transformar em segundos
+  Tant = millis();
+  
+  //CONTROLE P
+  Up = Kp*Erro;
+
+  //CONTROLE I
+  Ui = Ki*Ts*Erro + Uiant;
+  
+  //CONTROLE PI
+  U = Up + Ui;
+
+  //APLICAÇÃO DO CONTROLE
+  if (modo == 0){   //MODO AUTOMÁTICO (CONTROLE DEFINE O VALOR DA MANIPULADA)
+    if (U > 255) {
+      U = 255;
+    }
+    analogWrite(PWM, U);
+  }
+  
+  Serial.print(limite1);
+  Serial.print(" ");
+  Serial.print(limite2);
+  Serial.print(" ");
+  Serial.print(VP);
+  Serial.print(" ");
+  Serial.print(Ui);
+  Serial.print(" ");
+  Serial.println(sp);
+  
+  //ATUALIZAÇÃO DOS VALORES
+  Uiant = Ui;
+  Fant = Fatual;
+    
+}
